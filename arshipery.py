@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# encoding: utf-8
 
 # Playing battleships with archery.
 # You fire two arrows, one for the column index and one for the line index.
@@ -8,8 +10,15 @@
 # – The arrow distribution on the target follow a normal law.
 # – The drift on target is symetric in all direction. There is no covariance in the distribution.
 
-# Questions:
+# Statistics questions:
 # – Given a player's precision, what are the cells with the minimal probability of hit?
+#       A: 10/10, you'd better place ships on the 10th line and column.
+# – What if players have different levels?
+
+# Game theory questions:
+# – What if players have a limited number of arrows?
+# – What are the optimal mixed strategy (for ship placement and aiming)?
+
 
 import sys
 import math
@@ -84,72 +93,95 @@ if __name__ == "__main__":
     d_radius = 10
     dim = 2
     nb_circles = 10
-    player_level = {"01-gold":1, "02-yellow":2,"04-red":5,"06-blue":9,"08-black":11,"10-white":14,"99-crap":20}
+    player_level = {"01-gold":1, "02-yellow":3,"04-red":5,"06-blue":9,"08-black":11,"10-white":15,"100-crap":25,"900-wtf":40}
     print("levels=",sorted(player_level.keys()))
 
     targets = make_target(nb_circles, d_radius)
     print("targets=",targets)
 
-    # One line per player level, two subplots:
-    # on left, an example target, on right the density of probability.
-    fig, axarr = plt.subplots(len(player_level),3)
+    # One column per player level, two subplots:
+    # oup, an example target, down the density of probability.
+    fig1, axarr = plt.subplots(2, len(player_level))
 
-
-    for i,pl in enumerate(sorted(player_level.keys())):
-        print(i,"/",len(player_level),":",pl)
+    lvl_score = {}
+    for i,pl1 in enumerate(sorted(player_level.keys())):
+        print(i,"/",len(player_level),":",pl1)
         sys.stdout.flush()
 
         # DRAW TARGET
 
         # Pastel
-        targets_colors = ["gold","lightcoral","lightblue","lightgrey","white",]
+        # targets_colors = ["gold","lightcoral","lightblue","lightgrey","white",]
 
         # Official
-        # targets_colors = ["yellow","red","blue","black","white",]
+        targets_colors = ["yellow","red","blue","black","white",]
 
         prev_r = 0
         for t,(inf,sup) in enumerate(targets):
-            face   =  plt.Circle((0, 0), sup, color=targets_colors[(nb_circles-t-1)//2],zorder=2)
-            border =  plt.Circle((0, 0), sup, color="grey", fill=False,zorder=2)
-            axarr[i,0].add_artist(face)
-            axarr[i,0].add_artist(border)
-            axarr[i,0].set_aspect("equal")
+            face   =  plt.Circle((0, 0), sup, color=targets_colors[(nb_circles-t-1)//2],zorder=1)
+            border =  plt.Circle((0, 0), sup, color="grey", fill=False,zorder=3)
+            axarr[0,i].add_artist(face)
+            axarr[0,i].add_artist(border)
+            axarr[0,i].set_aspect("equal")
 
 
         # DRAW ARROWS
-        # for i,k in enumerate(player_level.keys()):
-        #     arrows = fire(nb_arrows, 10-i, player_level[k])
-        #     axarr[0,0].scatter(*arrows, edgecolor=player_color[i], color="none", alpha=0.3, marker=".", zorder=100)
 
-        arrows, score = play(player_level[pl], player_level[pl], nb_circles, nb_arrows, dim)
-
+        arrows, score = play(player_level[pl1], player_level[pl1], nb_circles, nb_arrows, dim)
+        lvl_score[(player_level[pl1], player_level[pl1])] = score
 
         # Plot arbitrary arrows.
         aim_p1 = 1
         aim_p2 = 1
         max_points = 100
         lim = 2 * (nb_circles * d_radius)
-        axarr[i,0].set_xlim((-lim,lim))
-        axarr[i,0].set_ylim((-lim,lim))
+        axarr[0,i].set_xlim((-lim,lim))
+        axarr[0,i].set_ylim((-lim,lim))
         p1,p2 = 0,1
         p1_arrows = arrows[aim_p1-1][aim_p2-1][p1][:,:max_points]
         p2_arrows = arrows[aim_p1-1][aim_p2-1][p2][:,:max_points]
-        axarr[i,0].scatter(*    p1_arrows , edgecolor="magenta", color="none", alpha=0.3, marker=".", zorder=100)
-        axarr[i,0].scatter(*(-1*p2_arrows), edgecolor="green"  , color="none", alpha=0.3, marker=".", zorder=100)
 
+        axarr[0,i].scatter(*    p1_arrows , edgecolor="magenta", color="none", alpha=0.5, marker=".", zorder=2)
+        axarr[0,i].scatter(*(-1*p2_arrows), edgecolor="green"  , color="none", alpha=0.5, marker=".", zorder=2)
+        axarr[0,i].set_title(pl1.split("-")[1])
+        axarr[0,i].axes.get_yaxis().set_visible(False)
+        axarr[0,i].axes.get_xaxis().set_visible(False)
+
+
+        # Compute probabilities of hit
         H,xe,ye = np.histogram2d(*score, bins=11, normed=True)
 
-        # Plot the full normalized histogram
-        axarr[i,1].imshow(H, interpolation='nearest', origin='low',
-                # extent=[xe[0],xe[-1],ye[0],ye[-1]]
-                # extent=[0,11,0,11]
-        )
+        # # Plot the full normalized histogram
+        # axarr[i,1].imshow(H, interpolation='nearest', origin='low',
+        #         # extent=[xe[0],xe[-1],ye[0],ye[-1]]
+        #         # extent=[0,11,0,11]
+        # )
 
         # Plot the normalized histogram without out arrows.
-        axarr[i,2].imshow(H[1:,1:], interpolation='nearest', origin='low',
+        im = axarr[1,i].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap="viridis",
                 # extent=[xe[0],xe[-1],ye[0],ye[-1]]
                 # extent=[1,11,1,11]
         )
 
-    plt.show()
+        # fig1.colorbar(im, ax=axarr[1,i])
 
+        # Grid
+        minticks = [i-0.5 for i in range(nb_circles+1)]
+        axarr[1,i].set_xticks(minticks, minor=True)
+        axarr[1,i].set_yticks(minticks, minor=True)
+        axarr[1,i].grid(which="minor")
+
+        # Labels
+        majticks = [i for i in range(nb_circles)]
+        labels = [i+1 for i in range(nb_circles)]
+        axarr[1,i].set_xticks(majticks)
+        axarr[1,i].set_yticks(majticks)
+        axarr[1,i].set_xticklabels(labels)
+        axarr[1,i].set_yticklabels(labels)
+
+
+    # s = 1000
+    # h,w = s * 3, s * 4
+    # plt.savefig("target_eq-levels.png",dpi=300, figsize=(h,w))
+
+    plt.show()
