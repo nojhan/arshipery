@@ -86,14 +86,41 @@ def play(p1_level, p2_level, nb_circles, nb_arrows, dim = 2):
     return arrows, score
 
 
+def plot_targets(ax, targets):
+    nb_circles = len(targets)-1
+
+    # Pastel target colors
+    # targets_colors = ["gold","lightcoral","lightblue","lightgrey","white",]
+
+    # Official targets color
+    targets_colors = ["yellow","red","blue","black","white",]
+
+    prev_r = 0
+    for t,(inf,sup) in enumerate(targets):
+        face   =  plt.Circle((0, 0), sup, color=targets_colors[(nb_circles-t-1)//2], zorder=1, linewidth=0.2)
+        # border =  plt.Circle((0, 0), sup, color="grey", fill=False,zorder=2)
+        ax.add_artist(face)
+        # ax.add_artist(border)
+        ax.set_aspect("equal")
+    # last circle
+    last_border =  plt.Circle((0, 0), targets[0][1], color="grey", fill=False, zorder=2)
+    ax.add_artist(last_border)
+
+    return
+
+
 if __name__ == "__main__":
 
-    nb_arrows = 10000
+    if len(sys.argv) > 1:
+        nb_arrows = int(sys.argv[1])
+    else:
+        nb_arrows = 10
 
     d_radius = 10
     dim = 2
     nb_circles = 10
-    player_level = {"01-gold":1, "02-yellow":3,"04-red":5,"06-blue":9,"08-black":11,"10-white":15,"100-crap":25,"900-wtf":40}
+    player_level = {"01-gold":1, "02-yellow":3,"04-red":5,"06-blue":9,"08-black":13,"10-white":17,"100-crap":25,"900-wtf":40}
+    nb_lvl = len(player_level)
     print("levels=",sorted(player_level.keys()))
 
     targets = make_target(nb_circles, d_radius)
@@ -101,84 +128,83 @@ if __name__ == "__main__":
 
     # One column per player level, two subplots:
     # oup, an example target, down the density of probability.
-    fig1, axarr = plt.subplots(2, len(player_level))
+    fig1, axarr = plt.subplots(nb_lvl+1,nb_lvl+1)
 
     lvl_score = {}
+    k = 0
     for i,pl1 in enumerate(sorted(player_level.keys())):
-        print(i,"/",len(player_level),":",pl1)
-        sys.stdout.flush()
+        for j,pl2 in enumerate(sorted(player_level.keys())):
+            fi, fj = i+1, j+1
+            print(k,"/",nb_lvl*nb_lvl,":",pl1,"VS",pl2)
+            k+=1
+            sys.stdout.flush()
 
-        # DRAW TARGET
+            # FIRE ARROWS
+            arrows, score = play(player_level[pl1], player_level[pl2], nb_circles, nb_arrows, dim)
+            lvl_score[(player_level[pl1], player_level[pl2])] = score
 
-        # Pastel
-        # targets_colors = ["gold","lightcoral","lightblue","lightgrey","white",]
+            # PLOT TARGET
+            plot_targets(axarr[0,fj], targets)
+            plot_targets(axarr[fi,0], targets)
 
-        # Official
-        targets_colors = ["yellow","red","blue","black","white",]
+            # PLOT (some) ARROWS
+            if i==j:
+                aim_p1, aim_p2 = 10,10
+                max_points = 100
+                lim = 1.5 * (nb_circles * d_radius)
+                axarr[0,fj].set_xlim((-lim,lim))
+                axarr[fi,0].set_xlim((-lim,lim))
+                axarr[0,fj].set_ylim((-lim,lim))
+                axarr[fi,0].set_ylim((-lim,lim))
+                p1,p2 = 0,1
+                p1_arrows = arrows[aim_p1-1][aim_p2-1][p1][:,:max_points]
+                p2_arrows = arrows[aim_p1-1][aim_p2-1][p2][:,:max_points]
 
-        prev_r = 0
-        for t,(inf,sup) in enumerate(targets):
-            face   =  plt.Circle((0, 0), sup, color=targets_colors[(nb_circles-t-1)//2],zorder=1)
-            border =  plt.Circle((0, 0), sup, color="grey", fill=False,zorder=3)
-            axarr[0,i].add_artist(face)
-            axarr[0,i].add_artist(border)
-            axarr[0,i].set_aspect("equal")
+                axarr[0,fj].scatter(*    p1_arrows , edgecolor="green", color="green", alpha=0.9, marker=".", zorder=3)
+                axarr[fi,0].scatter(*(-1*p2_arrows), edgecolor="green", color="green", alpha=0.9, marker=".", zorder=3)
 
+                axarr[fi,0].set_title(pl1.split("-")[1])
+                axarr[0,fj].set_title(pl2.split("-")[1])
 
-        # DRAW ARROWS
-
-        arrows, score = play(player_level[pl1], player_level[pl1], nb_circles, nb_arrows, dim)
-        lvl_score[(player_level[pl1], player_level[pl1])] = score
-
-        # Plot arbitrary arrows.
-        aim_p1 = 1
-        aim_p2 = 1
-        max_points = 100
-        lim = 2 * (nb_circles * d_radius)
-        axarr[0,i].set_xlim((-lim,lim))
-        axarr[0,i].set_ylim((-lim,lim))
-        p1,p2 = 0,1
-        p1_arrows = arrows[aim_p1-1][aim_p2-1][p1][:,:max_points]
-        p2_arrows = arrows[aim_p1-1][aim_p2-1][p2][:,:max_points]
-
-        axarr[0,i].scatter(*    p1_arrows , edgecolor="magenta", color="none", alpha=0.5, marker=".", zorder=2)
-        axarr[0,i].scatter(*(-1*p2_arrows), edgecolor="green"  , color="none", alpha=0.5, marker=".", zorder=2)
-        axarr[0,i].set_title(pl1.split("-")[1])
-        axarr[0,i].axes.get_yaxis().set_visible(False)
-        axarr[0,i].axes.get_xaxis().set_visible(False)
+                axarr[0,fj].axes.get_yaxis().set_visible(False)
+                axarr[fi,0].axes.get_yaxis().set_visible(False)
+                axarr[0,fj].axes.get_xaxis().set_visible(False)
+                axarr[fi,0].axes.get_xaxis().set_visible(False)
 
 
-        # Compute probabilities of hit
-        H,xe,ye = np.histogram2d(*score, bins=11, normed=True)
+            # PLOT proba maps
 
-        # # Plot the full normalized histogram
-        # axarr[i,1].imshow(H, interpolation='nearest', origin='low',
-        #         # extent=[xe[0],xe[-1],ye[0],ye[-1]]
-        #         # extent=[0,11,0,11]
-        # )
+            # Compute probabilities of hit
+            H,xe,ye = np.histogram2d(*score, bins=11, normed=True)
 
-        # Plot the normalized histogram without out arrows.
-        im = axarr[1,i].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap="viridis",
-                # extent=[xe[0],xe[-1],ye[0],ye[-1]]
-                # extent=[1,11,1,11]
-        )
+            # Plot the normalized histogram without out arrows.
+            if i==j:
+                colormap = "inferno"
+            else:
+                colormap = "viridis"
 
-        # fig1.colorbar(im, ax=axarr[1,i])
+            im = axarr[fi,fj].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap=colormap,
+                    # extent=[xe[0],xe[-1],ye[0],ye[-1]]
+                    # extent=[1,11,1,11]
+            )
 
-        # Grid
-        minticks = [i-0.5 for i in range(nb_circles+1)]
-        axarr[1,i].set_xticks(minticks, minor=True)
-        axarr[1,i].set_yticks(minticks, minor=True)
-        axarr[1,i].grid(which="minor")
+            # fig1.colorbar(im, ax=axarr[1,i])
 
-        # Labels
-        majticks = [i for i in range(nb_circles)]
-        labels = [i+1 for i in range(nb_circles)]
-        axarr[1,i].set_xticks(majticks)
-        axarr[1,i].set_yticks(majticks)
-        axarr[1,i].set_xticklabels(labels)
-        axarr[1,i].set_yticklabels(labels)
+            # Grid
+            minticks = [i-0.5 for i in range(nb_circles+1)]
+            axarr[fi,fj].set_xticks(minticks, minor=True)
+            axarr[fi,fj].set_yticks(minticks, minor=True)
+            axarr[fi,fj].grid(which="minor")
 
+            # Labels
+            majticks = [i for i in range(nb_circles)]
+            labels = [i+1 for i in range(nb_circles)]
+            axarr[fi,fj].set_xticks(majticks)
+            axarr[fi,fj].set_yticks(majticks)
+            axarr[fi,fj].set_xticklabels(labels)
+            axarr[fi,fj].set_yticklabels(labels)
+
+    fig1.delaxes(axarr[0,0])
 
     # s = 1000
     # h,w = s * 3, s * 4
