@@ -24,6 +24,7 @@ import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable, axes_size
 
 def x(p):
     return p[0]
@@ -106,7 +107,43 @@ def plot_targets(ax, targets):
     last_border =  plt.Circle((0, 0), targets[0][1], color="grey", fill=False, zorder=2)
     ax.add_artist(last_border)
 
-    return
+
+def format_grid(im, ax, nb_circles):
+    # Grid
+    minticks = [i-0.5 for i in range(nb_circles+1)]
+    ax.set_xticks(minticks, minor=True)
+    ax.set_yticks(minticks, minor=True)
+    ax.grid(which="minor")
+
+    # Labels
+    majticks = [i for i in range(nb_circles)]
+    labels = [i+1 for i in range(nb_circles)]
+    ax.set_xticks(majticks)
+    ax.set_yticks(majticks)
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+
+    for tick in ax.xaxis.get_major_ticks():
+        # tick.label.set_fontsize(8)
+        tick.label.set_fontsize(5)
+
+    for tick in ax.yaxis.get_major_ticks():
+        # tick.label.set_fontsize(8)
+        tick.label.set_fontsize(5)
+
+    # FIXME add color bars
+    aspect = 20
+    pad_fraction = 0.5
+    divider = make_axes_locatable(ax)
+    width = axes_size.AxesY(ax, aspect=1./aspect)
+    pad = axes_size.Fraction(pad_fraction, width)
+    cax = divider.append_axes("right", size=width, pad=pad)
+    cbar = plt.colorbar(im, cax=cax)
+    cbar.ax.tick_params(labelsize=5)
+    # v = np.linspace(0, 0.03, 3, endpoint=True)
+    # cbar.ax.set_yticklabels(["{:1.2f}".format(i) for i in v])
+
+    # fig1.colorbar(im, ax=axarr[1,i])
 
 
 if __name__ == "__main__":
@@ -114,7 +151,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         nb_arrows = int(sys.argv[1])
     else:
-        nb_arrows = 10
+        nb_arrows = 10000
 
     d_radius = 10
     dim = 2
@@ -141,7 +178,7 @@ if __name__ == "__main__":
 
             # FIRE ARROWS
             arrows, score = play(player_level[pl1], player_level[pl2], nb_circles, nb_arrows, dim)
-            lvl_score[(player_level[pl1], player_level[pl2])] = score
+            lvl_score[(pl1,pl2)] = score
 
             # PLOT TARGET
             plot_targets(axarr[0,fj], targets)
@@ -163,7 +200,8 @@ if __name__ == "__main__":
                 axarr[0,fj].scatter(*    p1_arrows , edgecolor="green", color="green", alpha=0.9, marker=".", zorder=3)
                 axarr[fi,0].scatter(*(-1*p2_arrows), edgecolor="green", color="green", alpha=0.9, marker=".", zorder=3)
 
-                axarr[fi,0].set_title(pl1.split("-")[1])
+                # axarr[fi,0].set_title(pl1.split("-")[1])
+                axarr[fi,0].text(-200, 0, pl1.split("-")[1], ha='center', va='center', rotation='vertical')
                 axarr[0,fj].set_title(pl2.split("-")[1])
 
                 axarr[0,fj].axes.get_yaxis().set_visible(False)
@@ -179,32 +217,41 @@ if __name__ == "__main__":
 
             # Plot the normalized histogram without out arrows.
             if i==j:
-                colormap = "inferno"
+                colormap = "cubehelix"
             else:
                 colormap = "viridis"
 
-            im = axarr[fi,fj].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap=colormap,
-                    # extent=[xe[0],xe[-1],ye[0],ye[-1]]
-                    # extent=[1,11,1,11]
-            )
+            im = axarr[fi,fj].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap=colormap,)
+            format_grid(im, axarr[fi,fj], nb_circles)
 
-            # fig1.colorbar(im, ax=axarr[1,i])
 
-            # Grid
-            minticks = [i-0.5 for i in range(nb_circles+1)]
-            axarr[fi,fj].set_xticks(minticks, minor=True)
-            axarr[fi,fj].set_yticks(minticks, minor=True)
-            axarr[fi,fj].grid(which="minor")
+    # PLOT RANDOM TEAMS
+    # Draw random player levels couples
+    nb_games = int(math.sqrt(nb_arrows)*10)
+    nb_subarrows = max(int(math.sqrt(nb_arrows)*10), nb_arrows)
+    pl1 = [int(i) for i in np.random.randn(nb_games) + len(player_level)//2]
+    pl2 = [int(i) for i in np.random.randn(nb_games) + len(player_level)//2]
+    for i in range(nb_games):
+        if 0 > pl1[i] > len(player_level):
+            pl1[i] = np.random.uniform(0,len(player_level))
+        if 0 > pl2[i] > len(player_level):
+            pl2[i] = np.random.uniform(0,len(player_level))
 
-            # Labels
-            majticks = [i for i in range(nb_circles)]
-            labels = [i+1 for i in range(nb_circles)]
-            axarr[fi,fj].set_xticks(majticks)
-            axarr[fi,fj].set_yticks(majticks)
-            axarr[fi,fj].set_xticklabels(labels)
-            axarr[fi,fj].set_yticklabels(labels)
+    p1,p2 = 0,1
+    score1 = []
+    score2 = []
+    for i in range(nb_games):
+        print(i,"/",nb_games,end="\r")
+        k1, k2 = (pl1[i], pl2[i])
+        lvl_pair = list(player_level.keys())[k1], list(player_level.keys())[k2]
+        full_score = lvl_score[lvl_pair]
+        score1 = np.concatenate( (score1, np.random.choice(full_score[p1], (nb_subarrows))) )
+        score2 = np.concatenate( (score2, np.random.choice(full_score[p2], (nb_subarrows))) )
 
-    fig1.delaxes(axarr[0,0])
+    H,xe,ye = np.histogram2d(score1, score2, bins=11, normed=True)
+    im = axarr[0,0].imshow(H[1:,1:], interpolation='nearest', origin='low', cmap="inferno",)
+    format_grid(im, axarr[0,0], nb_circles)
+
 
     # s = 1000
     # h,w = s * 3, s * 4
